@@ -7,7 +7,9 @@ using Microsoft.Extensions.Configuration.Json;
 using Azure;
 
 // Add Azure OpenAI packages
-
+// Add Azure OpenAI packages
+using Azure.AI.OpenAI;
+using OpenAI.Chat;
 
 // Build a config object and retrieve user settings.
 class ChatMessageLab
@@ -27,7 +29,13 @@ oaiKey = config["AzureOAIKey"];
 oaiDeploymentName = config["AzureOAIDeploymentName"];
 
 //Initialize messages list
-
+// Initialize messages list
+Console.WriteLine("\nAdding grounding context from grounding.txt");
+string groundingText = System.IO.File.ReadAllText("grounding.txt");
+var messagesList = new List<ChatMessage>()
+{
+    new UserChatMessage(groundingText),
+};
 do {
     // Pause for system message update
     Console.WriteLine("-----------\nPausing the app to allow you to change the system prompt.\nPress any key to continue...");
@@ -53,15 +61,18 @@ do {
     else
     {
         // Format and send the request to the model
-
-        GetResponseFromOpenAI(systemMessage, userMessage);
+// Format and send the request to the model
+messagesList.Add(new SystemChatMessage(systemMessage));
+messagesList.Add(new UserChatMessage(userMessage));
+GetResponseFromOpenAI(messagesList);
     }
 } while (true);
 
 }
 
 // Define the function that gets the response from Azure OpenAI endpoint
-private static void GetResponseFromOpenAI(string systemMessage, string userMessage)  
+// Define the function that gets the response from Azure OpenAI endpoint
+private static void GetResponseFromOpenAI(List<ChatMessage> messagesList)
 {   
     Console.WriteLine("\nSending prompt to Azure OpenAI endpoint...\n\n");
 
@@ -72,11 +83,26 @@ private static void GetResponseFromOpenAI(string systemMessage, string userMessa
     }
 
 // Configure the Azure OpenAI client
-
+// Configure the Azure OpenAI client
+AzureOpenAIClient azureClient = new (new Uri(oaiEndpoint), new ApiKeyCredential(oaiKey));
+ChatClient chatClient = azureClient.GetChatClient(oaiDeploymentName);
 
 
 // Get response from Azure OpenAI
+// Get response from Azure OpenAI
+ChatCompletionOptions chatCompletionOptions = new ChatCompletionOptions()
+{
+    Temperature = 0.7f,
+    MaxOutputTokenCount = 800
+};
 
+ChatCompletion completion = chatClient.CompleteChat(
+    messagesList,
+    chatCompletionOptions
+);
+
+Console.WriteLine($"{completion.Role}: {completion.Content[0].Text}");
+messagesList.Add(new AssistantChatMessage(completion.Content[0].Text));
 
 
 
